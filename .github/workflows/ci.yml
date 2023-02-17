@@ -33,7 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install cargo-tarpaulin
+      - uses: baptiste0928/cargo-install@v1
+        with:
+          crate: cargo-tarpaulin
       - run: cargo tarpaulin --ignore-tests
 
   audit:
@@ -42,5 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install cargo-audit
+      - uses: baptiste0928/cargo-install@v1
+        with:
+          crate: cargo-audit
       - run: cargo audit
