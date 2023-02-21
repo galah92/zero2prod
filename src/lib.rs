@@ -29,13 +29,12 @@ mod routes {
         email: String,
     }
 
-    // #[post("/subscriptions")]
     #[tracing::instrument(skip(db_pool))]
     pub async fn subscribe(
         form: web::Form<FormData>,
         db_pool: web::Data<PgPool>,
     ) -> impl Responder {
-        let query_result = sqlx::query!(
+        sqlx::query!(
             r#"
             INSERT INTO subscriptions (id, email, name, subscribed_at)
             VALUES ($1, $2, $3, $4)
@@ -46,14 +45,14 @@ mod routes {
             OffsetDateTime::now_utc(),
         )
         .execute(db_pool.get_ref())
-        .await;
-        match query_result {
-            Ok(_) => HttpResponse::Ok(),
-            Err(e) => {
+        .await
+        .map_or_else(
+            |e| {
                 tracing::error!("{}", e);
                 HttpResponse::InternalServerError()
-            }
-        }
+            },
+            |_| HttpResponse::Ok(),
+        )
         .await
     }
 }
