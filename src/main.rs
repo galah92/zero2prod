@@ -8,7 +8,7 @@ async fn main() -> std::io::Result<()> {
     zero2prod::init_tracing();
 
     let settings = zero2prod::get_settings().expect("Failed to read config");
-    let address = format!("127.0.0.1:{}", settings.port);
+    let address = format!("{}:{}", settings.app.host, settings.app.port);
 
     let db_pool = PgPool::connect(&settings.database.connection_string())
         .await

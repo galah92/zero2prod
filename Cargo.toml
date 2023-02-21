@@ -12,7 +12,7 @@ path = "src/lib.rs"
 actix-web = "4.3.0"
 config = "0.13.3"
 serde = { version = "1.0.152", features = ["derive"] }
-sqlx = { version = "0.6.2", features = ["runtime-actix-rustls", "postgres", "macros", "uuid", "time", "migrate"] }
+sqlx = { version = "0.6.2", features = ["runtime-actix-rustls", "postgres", "macros", "uuid", "time", "migrate", "offline"] }
 time = "0.3.19"
 tracing = { version = "0.1.37", features = ["log"] }
 tracing-actix-web = "0.7.2"

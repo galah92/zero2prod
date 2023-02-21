@@ -1,7 +1,13 @@
 #[derive(serde::Deserialize)]
 pub struct Settings {
-    pub port: u16, // port to listen on
+    pub app: ApplicationSettings,
     pub database: DatabaseSettings,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ApplicationSettings {
+    pub host: String,
+    pub port: u16,
 }
 
 #[derive(serde::Deserialize)]
@@ -23,8 +29,15 @@ impl DatabaseSettings {
 }
 
 pub fn get_settings() -> Result<Settings, config::ConfigError> {
+    let app_env = std::env::var("APP_ENV").unwrap_or_else(|_| "local".to_string());
+
+    let base_path = std::env::current_dir().expect("Could not find current directory");
+    let settings_path = base_path.join("settings");
+
     let settings = config::Config::builder()
-        .add_source(config::File::with_name("settings"))
+        .add_source(config::File::from(settings_path.join("base")))
+        .add_source(config::File::from(settings_path.join(app_env)))
         .build()?;
+
     settings.try_deserialize()
 }
