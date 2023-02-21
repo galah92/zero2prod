@@ -1,12 +1,17 @@
 use actix_web::{
     http::{self, header::ContentType},
-    test, App,
+    test, web, App,
 };
+use sqlx::PgPool;
 use zero2prod::app_config;
 
-#[actix_web::test]
-async fn subscribe_returns_a_200_for_valid_form_data() {
-    let app = test::init_service(App::new().configure(app_config)).await;
+#[sqlx::test]
+async fn subscribe_returns_a_200_for_valid_form_data(
+    db_pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app_data = web::Data::new(db_pool.clone());
+    let app = test::init_service(App::new().configure(app_config).app_data(app_data)).await;
+
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let req = test::TestRequest::post()
         .uri("/subscriptions")
@@ -15,10 +20,18 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .to_request();
     let res = test::call_service(&app, req).await;
     assert_eq!(res.status(), http::StatusCode::OK);
+
+    let record = sqlx::query!("SELECT email, name FROM subscriptions",)
+        .fetch_one(&db_pool)
+        .await?;
+    assert_eq!(record.email, "ursula_le_guin@gmail.com");
+    assert_eq!(record.name, "le guin");
+
+    Ok(())
 }
 
 #[actix_web::test]
-async fn subscribe_returns_a_400_when_data_is_missing() {
+async fn subscribe_returns_a_400_when_data_is_missing() -> Result<(), Box<dyn std::error::Error>> {
     let app = test::init_service(App::new().configure(app_config)).await;
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),
@@ -39,4 +52,6 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
             error_message
         );
     }
+
+    Ok(())
 }
