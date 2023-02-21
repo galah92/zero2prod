@@ -6,21 +6,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SQLX_FEATURES: "rustls,postgres"
 
 jobs:
-  lint:
-    name: Lint & Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy -- -D warnings
-
-  test:
+  build:
     name: Build & Test
     runs-on: ubuntu-latest
     services:
@@ -35,27 +23,25 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install sqlx-cli --features ${{ env.SQLX_FEATURES }} --locked
-      - run: sudo apt-get install libpq-dev -y SKIP_DOCKER=true ./scripts/init_db.sh
+        with:
+          components: rustfmt, clippy
+
+      - uses: baptiste0928/cargo-install@v1
+        with:
+          crate: sqlx-cli
+          args: --no-default-features --features rustls,postgres
+      - run: sudo apt-get install -y libpq-dev
+      - run: SKIP_DOCKER=true ./scripts/init_db.sh
+
+      - run: cargo clippy -- -D warnings
+      - run: cargo fmt --all -- --check
       - run: cargo test --all-features
 
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
       - uses: baptiste0928/cargo-install@v1
         with:
           crate: cargo-tarpaulin
       - run: cargo tarpaulin --ignore-tests
 
-  audit:
-    name: Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
       - uses: baptiste0928/cargo-install@v1
         with:
           crate: cargo-audit
