@@ -1,5 +1,6 @@
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::{web, App, HttpServer};
 use sqlx::PgPool;
+use tracing_actix_web::TracingLogger;
 use zero2prod::app_config;
 
 #[actix_web::main]
@@ -16,7 +17,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(Logger::default())
+            .wrap(TracingLogger::default())
             .configure(app_config)
             .app_data(db_pool.clone())
     })
