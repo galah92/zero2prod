@@ -1,3 +1,7 @@
+pub mod settings;
+
+pub use settings::get_settings;
+
 use actix_web::{get, post, web, HttpResponse, Responder};
 use serde::Deserialize;
 
