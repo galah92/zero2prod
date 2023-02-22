@@ -1,6 +1,6 @@
 FROM rust:slim-bullseye AS builder
+RUN apt-get update -y && export DEBIAN_FRONTEND=noninteractive && apt-get install -y lld clang
 WORKDIR /app
-RUN apt-get update && apt-get install -y lld clang
 COPY Cargo.toml Cargo.lock ./
 RUN cargo fetch
 COPY . .
