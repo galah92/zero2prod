@@ -6,6 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DATABASE_URL: postgres://postgres:password@localhost:5432/newsletter
 
 jobs:
   build:
@@ -32,17 +33,12 @@ jobs:
           args: --no-default-features --features rustls,postgres
       - run: sudo apt-get install -y libpq-dev
       - run: SKIP_DOCKER=true ./scripts/init_db.sh
-      - run: cargo sqlx prepare --check -- --bin zero2prod
 
       - run: cargo build --release
       - run: cargo clippy -- -D warnings
       - run: cargo fmt --all -- --check
+      - run: cargo sqlx prepare --check -- --bin zero2prod
       - run: cargo test --all-features
-
-      - uses: baptiste0928/cargo-install@v1
-        with:
-          crate: cargo-tarpaulin
-      - run: cargo tarpaulin --ignore-tests
 
       - uses: baptiste0928/cargo-install@v1
         with:
