@@ -9,28 +9,28 @@ pub struct EmailClient {
 }
 
 #[derive(serde::Serialize)]
-struct EmailRequestBody {
-    personalizations: Vec<Personalization>,
-    from: EmailAddress,
-    content: Vec<Content>,
+struct EmailRequestBody<'a> {
+    personalizations: Vec<Personalization<'a>>,
+    from: EmailAddress<'a>,
+    content: Vec<Content<'a>>,
 }
 
 #[derive(serde::Serialize)]
-struct Personalization {
-    to: Vec<EmailAddress>,
-    subject: String,
+struct Personalization<'a> {
+    to: Vec<EmailAddress<'a>>,
+    subject: &'a str,
 }
 
 #[derive(serde::Serialize)]
-struct EmailAddress {
-    email: String,
+struct EmailAddress<'a> {
+    email: &'a str,
 }
 
 #[derive(serde::Serialize)]
-struct Content {
+struct Content<'a> {
     #[serde(rename = "type")]
-    content_type: String,
-    value: String,
+    content_type: &'a str,
+    value: &'a str,
 }
 
 impl EmailClient {
@@ -53,22 +53,20 @@ impl EmailClient {
         // based on https://docs.sendgrid.com/api-reference/mail-send/mail-send#body
         let body = EmailRequestBody {
             personalizations: vec![Personalization {
-                to: vec![EmailAddress {
-                    email: to.as_ref().to_string(),
-                }],
-                subject: subject.to_string(),
+                to: vec![EmailAddress { email: to.as_ref() }],
+                subject,
             }],
             from: EmailAddress {
-                email: self.from.as_ref().to_string(),
+                email: self.from.as_ref(),
             },
             content: vec![
                 Content {
-                    content_type: "text/plain".to_string(),
-                    value: text_content.to_string(),
+                    content_type: "text/plain",
+                    value: text_content,
                 },
                 Content {
-                    content_type: "text/html".to_string(),
-                    value: html_content.to_string(),
+                    content_type: "text/html",
+                    value: html_content,
                 },
             ],
         };
