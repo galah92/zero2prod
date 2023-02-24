@@ -13,9 +13,11 @@ async fn main() -> std::io::Result<()> {
     let db_pool = PgPool::connect_lazy(&settings.database_url).unwrap();
     let db_pool = web::Data::new(db_pool);
 
-    let email_base_url = settings.email_base_url;
-    let email_sender = SubscriberEmail::parse(settings.email_sender).unwrap();
-    let email_client = EmailClient::new(email_base_url, email_sender);
+    let email_client = EmailClient::new(
+        settings.email_base_url,
+        settings.email_auth_token,
+        SubscriberEmail::parse(settings.email_sender).unwrap(),
+    );
     let email_client = web::Data::new(email_client);
 
     HttpServer::new(move || {

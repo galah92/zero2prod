@@ -6,6 +6,7 @@ pub struct Settings {
     pub app_port: u16,
     pub database_url: String,
     pub email_base_url: String,
+    pub email_auth_token: String,
     pub email_sender: String,
 }
 
