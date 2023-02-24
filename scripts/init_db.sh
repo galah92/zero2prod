@@ -39,3 +39,8 @@ done
 export DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}
 sqlx database create
 sqlx migrate run
+
+# GCP Cloud SQL connection string:
+# postgresql://newsletter?host=/cloudsql/gal-playground:us-central1:quickstart-instance&user=postgres&password=postgres
+# Requires GCP SQL Proxy to be running locally:
+# ./cloud-sql-proxy --unix-socket /cloudsql --credentials-file compute-engine-sa.json gal-playground:us-central1:quickstart-instance &
