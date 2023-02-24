@@ -5,6 +5,8 @@ pub struct Settings {
     pub app_host: String,
     pub app_port: u16,
     pub database_url: String,
+    pub email_base_url: String,
+    pub email_sender: String,
 }
 
 pub fn get_settings() -> Result<Settings, ConfigError> {

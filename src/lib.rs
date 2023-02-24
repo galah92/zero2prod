@@ -1,8 +1,11 @@
 mod domain;
+mod email;
 mod routes;
 mod settings;
 mod telemetry;
 
+pub use domain::SubscriberEmail;
+pub use email::EmailClient;
 pub use settings::get_settings;
 pub use telemetry::init_tracing;
 
