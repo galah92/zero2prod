@@ -46,6 +46,13 @@ impl AsRef<str> for SubscriberEmail {
 #[cfg(test)]
 mod tests {
     use super::{SubscriberEmail, SubscriberName};
+    use fake::{faker::internet::en::SafeEmail, Fake};
+
+    #[test]
+    fn a_valid_name_is_parsed_successfully() {
+        let name = "Ursula Le Guin".to_string();
+        assert!(SubscriberName::parse(name).is_ok());
+    }
 
     #[test]
     fn a_256_grapheme_long_name_is_valid() {
@@ -80,9 +87,9 @@ mod tests {
     }
 
     #[test]
-    fn a_valid_name_is_parsed_successfully() {
-        let name = "Ursula Le Guin".to_string();
-        assert!(SubscriberName::parse(name).is_ok());
+    fn valid_emails_are_parsed_correctly() {
+        let email = SafeEmail().fake();
+        assert!(SubscriberEmail::parse(email).is_ok());
     }
 
     #[test]
