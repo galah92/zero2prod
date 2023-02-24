@@ -8,31 +8,6 @@ pub struct EmailClient {
     from: SubscriberEmail,
 }
 
-#[derive(serde::Serialize)]
-struct EmailRequestBody<'a> {
-    personalizations: Vec<Personalization<'a>>,
-    from: EmailAddress<'a>,
-    content: Vec<Content<'a>>,
-}
-
-#[derive(serde::Serialize)]
-struct Personalization<'a> {
-    to: Vec<EmailAddress<'a>>,
-    subject: &'a str,
-}
-
-#[derive(serde::Serialize)]
-struct EmailAddress<'a> {
-    email: &'a str,
-}
-
-#[derive(serde::Serialize)]
-struct Content<'a> {
-    #[serde(rename = "type")]
-    content_type: &'a str,
-    value: &'a str,
-}
-
 impl EmailClient {
     pub fn new(base_url: String, auth_token: String, from: SubscriberEmail) -> Self {
         let http_client = Client::builder()
@@ -85,6 +60,31 @@ impl EmailClient {
     }
 }
 
+#[derive(serde::Serialize)]
+struct EmailRequestBody<'a> {
+    personalizations: Vec<Personalization<'a>>,
+    from: EmailAddress<'a>,
+    content: Vec<Content<'a>>,
+}
+
+#[derive(serde::Serialize)]
+struct Personalization<'a> {
+    to: Vec<EmailAddress<'a>>,
+    subject: &'a str,
+}
+
+#[derive(serde::Serialize)]
+struct EmailAddress<'a> {
+    email: &'a str,
+}
+
+#[derive(serde::Serialize)]
+struct Content<'a> {
+    #[serde(rename = "type")]
+    content_type: &'a str,
+    value: &'a str,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{EmailClient, SubscriberEmail};
@@ -93,12 +93,25 @@ mod tests {
     use wiremock::matchers::{any, header, header_exists, method};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    #[tokio::test]
-    async fn send_email_fires_a_request_tobase_url() -> Result<(), Box<dyn std::error::Error>> {
+    async fn get_mock_client() -> (EmailClient, MockServer) {
         let mock_server = MockServer::start().await;
         let auth_token = Faker.fake();
-        let from = SubscriberEmail::parse(SafeEmail().fake())?;
+        let from = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
         let email_client = EmailClient::new(mock_server.uri(), auth_token, from);
+        (email_client, mock_server)
+    }
+
+    async fn get_mock_req_data() -> (SubscriberEmail, String, String) {
+        let to = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
+        let subject: String = Sentence(1..2).fake();
+        let content: String = Paragraph(1..10).fake();
+        (to, subject, content)
+    }
+
+    #[tokio::test]
+    async fn send_email_fires_a_request_tobase_url() -> Result<(), Box<dyn std::error::Error>> {
+        let (email_client, mock_server) = get_mock_client().await;
+        let (to, subject, content) = get_mock_req_data().await;
 
         Mock::given(any())
             .and(header_exists("Authorization"))
@@ -108,10 +121,6 @@ mod tests {
             .expect(1)
             .mount(&mock_server)
             .await;
-
-        let to = SubscriberEmail::parse(SafeEmail().fake())?;
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..10).fake();
 
         email_client
             .send_email(&to, &subject, &content, &content)
@@ -123,14 +132,8 @@ mod tests {
     #[tokio::test]
     async fn send_email_succeeds_if_the_server_returns_200(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mock_server = MockServer::start().await;
-        let auth_token = Faker.fake();
-        let from = SubscriberEmail::parse(SafeEmail().fake())?;
-        let email_client = EmailClient::new(mock_server.uri(), auth_token, from);
-
-        let to = SubscriberEmail::parse(SafeEmail().fake())?;
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..10).fake();
+        let (email_client, mock_server) = get_mock_client().await;
+        let (to, subject, content) = get_mock_req_data().await;
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(202))
@@ -148,15 +151,8 @@ mod tests {
     #[tokio::test]
     async fn send_email_fails_if_the_server_returns_500() -> Result<(), Box<dyn std::error::Error>>
     {
-        // Arrange
-        let mock_server = MockServer::start().await;
-        let auth_token = Faker.fake();
-        let from = SubscriberEmail::parse(SafeEmail().fake())?;
-        let email_client = EmailClient::new(mock_server.uri(), auth_token, from);
-
-        let to = SubscriberEmail::parse(SafeEmail().fake())?;
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..10).fake();
+        let (email_client, mock_server) = get_mock_client().await;
+        let (to, subject, content) = get_mock_req_data().await;
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(500))
