@@ -54,3 +54,32 @@ async fn subscribe_returns_a_400_when_data_is_missing() -> Result<(), Box<dyn st
 
     Ok(())
 }
+
+#[sqlx::test]
+async fn subscribe_returns_a_400_when_fields_are_present_but_empty(
+    db_pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app_data = web::Data::new(db_pool.clone());
+    let app = test::init_service(App::new().configure(app_config).app_data(app_data)).await;
+
+    let test_cases = vec![
+        ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
+        // ("name=Ursula&email=", "empty email"),
+        // ("name=Ursula&email=definitely-not-an-email", "invalid email"),
+    ];
+    for (body, description) in test_cases {
+        let req = test::TestRequest::post()
+            .uri("/subscriptions")
+            .insert_header(ContentType::form_url_encoded())
+            .set_payload(body)
+            .to_request();
+        let res = test::call_service(&app, req).await;
+        assert_eq!(
+            res.status(),
+            http::StatusCode::BAD_REQUEST,
+            "The API did not fail with 400 BAD_REQUEST when the payload was {description}."
+        );
+    }
+
+    Ok(())
+}
