@@ -6,7 +6,6 @@ pub struct Subscriber {
     pub email: SubscriberEmail,
 }
 
-
 pub struct SubscriberName(String);
 
 impl SubscriberName {
