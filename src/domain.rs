@@ -1,4 +1,5 @@
 use unicode_segmentation::UnicodeSegmentation;
+use validator::validate_email;
 
 pub struct SubscriberName(String);
 
@@ -24,9 +25,27 @@ impl AsRef<str> for SubscriberName {
     }
 }
 
+pub struct SubscriberEmail(String);
+
+impl SubscriberEmail {
+    pub fn parse(s: String) -> Result<Self, String> {
+        if validate_email(&s) {
+            Ok(Self(s))
+        } else {
+            Err(format!("Invalid email address: {s}"))
+        }
+    }
+}
+
+impl AsRef<str> for SubscriberEmail {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::SubscriberName;
+    use super::{SubscriberEmail, SubscriberName};
 
     #[test]
     fn a_256_grapheme_long_name_is_valid() {
@@ -47,10 +66,11 @@ mod tests {
     }
 
     #[test]
-    fn empty_string_is_rejected() {
+    fn name_empty_string_is_rejected() {
         let name = "".to_string();
         assert!(SubscriberName::parse(name).is_err());
     }
+
     #[test]
     fn names_containing_an_invalid_character_are_rejected() {
         for name in &['/', '(', ')', '"', '<', '>', '\\', '{', '}'] {
@@ -58,9 +78,28 @@ mod tests {
             assert!(SubscriberName::parse(name).is_err());
         }
     }
+
     #[test]
     fn a_valid_name_is_parsed_successfully() {
         let name = "Ursula Le Guin".to_string();
         assert!(SubscriberName::parse(name).is_ok());
+    }
+
+    #[test]
+    fn email_empty_string_is_rejected() {
+        let email = "".to_string();
+        assert!(SubscriberEmail::parse(email).is_err());
+    }
+
+    #[test]
+    fn email_missing_at_symbol_is_rejected() {
+        let email = "ursuladomain.com".to_string();
+        assert!(SubscriberEmail::parse(email).is_err());
+    }
+
+    #[test]
+    fn email_missing_subject_is_rejected() {
+        let email = "@domain.com".to_string();
+        assert!(SubscriberEmail::parse(email).is_err());
     }
 }

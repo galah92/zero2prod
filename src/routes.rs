@@ -27,13 +27,21 @@ pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) ->
             return HttpResponse::BadRequest().await;
         }
     };
+    let email = domain::SubscriberEmail::parse(form.email.clone());
+    let email = match email {
+        Ok(email) => email,
+        Err(_) => {
+            tracing::warn!("Invalid email: {}", &form.email);
+            return HttpResponse::BadRequest().await;
+        }
+    };
     sqlx::query!(
         r#"
             INSERT INTO subscriptions (id, email, name, subscribed_at)
             VALUES ($1, $2, $3, $4)
             "#,
         Uuid::new_v4(),
-        form.email,
+        email.as_ref(),
         name.as_ref(),
         OffsetDateTime::now_utc(),
     )
