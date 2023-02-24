@@ -49,7 +49,7 @@ impl EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), String> {
+    ) -> Result<(), reqwest::Error> {
         // based on https://docs.sendgrid.com/api-reference/mail-send/mail-send#body
         let body = EmailRequestBody {
             personalizations: vec![Personalization {
@@ -75,8 +75,8 @@ impl EmailClient {
             .header("Authorization", format!("Bearer {}", self.auth_token))
             .json(&body)
             .send()
-            .await
-            .map_err(|err| err.to_string())?;
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 }
@@ -112,6 +112,59 @@ mod tests {
         email_client
             .send_email(&to, &subject, &content, &content)
             .await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn send_email_succeeds_if_the_server_returns_200(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mock_server = MockServer::start().await;
+        let auth_token = Faker.fake();
+        let from = SubscriberEmail::parse(SafeEmail().fake())?;
+        let email_client = EmailClient::new(mock_server.uri(), auth_token, from);
+
+        let to = SubscriberEmail::parse(SafeEmail().fake())?;
+        let subject: String = Sentence(1..2).fake();
+        let content: String = Paragraph(1..10).fake();
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(202))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        email_client
+            .send_email(&to, &subject, &content, &content)
+            .await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn send_email_fails_if_the_server_returns_500() -> Result<(), Box<dyn std::error::Error>>
+    {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let auth_token = Faker.fake();
+        let from = SubscriberEmail::parse(SafeEmail().fake())?;
+        let email_client = EmailClient::new(mock_server.uri(), auth_token, from);
+
+        let to = SubscriberEmail::parse(SafeEmail().fake())?;
+        let subject: String = Sentence(1..2).fake();
+        let content: String = Paragraph(1..10).fake();
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(500))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let res = email_client
+            .send_email(&to, &subject, &content, &content)
+            .await;
+        assert!(res.is_err());
+
         Ok(())
     }
 }
