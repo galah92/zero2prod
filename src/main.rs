@@ -8,9 +8,9 @@ async fn main() -> std::io::Result<()> {
     zero2prod::init_tracing();
 
     let settings = zero2prod::get_settings().expect("Failed to read config");
-    let address = format!("{}:{}", settings.app.host, settings.app.port);
+    let address = format!("{}:{}", settings.app_host, settings.app_port);
 
-    let db_pool = PgPool::connect_lazy(&settings.database.connection_string()).unwrap();
+    let db_pool = PgPool::connect_lazy(&settings.database_url).unwrap();
     let db_pool = web::Data::new(db_pool);
 
     HttpServer::new(move || {
