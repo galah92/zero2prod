@@ -1,6 +1,12 @@
 use unicode_segmentation::UnicodeSegmentation;
 use validator::validate_email;
 
+pub struct Subscriber {
+    pub name: SubscriberName,
+    pub email: SubscriberEmail,
+}
+
+
 pub struct SubscriberName(String);
 
 impl SubscriberName {

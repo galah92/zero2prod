@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use super::domain;
+use super::domain::{Subscriber, SubscriberEmail, SubscriberName};
 
 #[tracing::instrument]
 pub async fn health_check() -> impl Responder {
@@ -17,21 +17,23 @@ pub struct FormData {
     email: String,
 }
 
+impl TryFrom<FormData> for Subscriber {
+    type Error = String;
+
+    fn try_from(value: FormData) -> Result<Self, Self::Error> {
+        let name = SubscriberName::parse(value.name)?;
+        let email = SubscriberEmail::parse(value.email)?;
+        Ok(Self { name, email })
+    }
+}
+
 #[tracing::instrument(skip(db_pool))]
 pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) -> impl Responder {
-    let name = domain::SubscriberName::parse(form.name.clone());
-    let name = match name {
-        Ok(name) => name,
-        Err(_) => {
-            tracing::warn!("Invalid name: {}", &form.name);
-            return HttpResponse::BadRequest().await;
-        }
-    };
-    let email = domain::SubscriberEmail::parse(form.email.clone());
-    let email = match email {
-        Ok(email) => email,
-        Err(_) => {
-            tracing::warn!("Invalid email: {}", &form.email);
+    let subscriber = Subscriber::try_from(form.0);
+    let subscriber = match subscriber {
+        Ok(subscriber) => subscriber,
+        Err(e) => {
+            tracing::warn!("{e}");
             return HttpResponse::BadRequest().await;
         }
     };
@@ -41,8 +43,8 @@ pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) ->
             VALUES ($1, $2, $3, $4)
             "#,
         Uuid::new_v4(),
-        email.as_ref(),
-        name.as_ref(),
+        subscriber.email.as_ref(),
+        subscriber.name.as_ref(),
         OffsetDateTime::now_utc(),
     )
     .execute(db_pool.get_ref())
