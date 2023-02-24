@@ -48,8 +48,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() -> Result<(), Box<dyn st
         assert_eq!(
             res.status(),
             http::StatusCode::BAD_REQUEST,
-            "The API did not fail with 400 Bad Request when the payload was {}.",
-            error_message
+            "The API did not fail with 400 Bad Request when the payload was {error_message}."
         );
     }
 
