@@ -41,6 +41,6 @@ sqlx database create
 sqlx migrate run
 
 # GCP Cloud SQL connection string:
-# postgresql://newsletter?host=/cloudsql/gal-playground:us-central1:quickstart-instance&user=postgres&password=postgres
+# postgresql:///newsletter?host=/cloudsql/gal-playground:us-central1:quickstart-instance&user=postgres&password=postgres
 # Requires GCP SQL Proxy to be running locally:
 # ./cloud-sql-proxy --unix-socket /cloudsql --credentials-file compute-engine-sa.json gal-playground:us-central1:quickstart-instance &
