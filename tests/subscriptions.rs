@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
 use zero2prod::{app_config, EmailClient, SubscriberEmail};
 
-async fn get_mock_client() -> EmailClient {
+async fn get_mock_client() -> (EmailClient, MockServer) {
     let mock_server = MockServer::start().await;
 
     let auth_token = Faker.fake();
@@ -19,14 +19,14 @@ async fn get_mock_client() -> EmailClient {
         .mount(&mock_server)
         .await;
 
-    email_client
+    (email_client, mock_server)
 }
 
 #[sqlx::test]
 async fn subscribe_returns_a_200_for_valid_form_data(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let email_client = get_mock_client().await;
+    let (email_client, _) = get_mock_client().await;
     let app = test::init_service(
         App::new()
             .configure(app_config)
@@ -57,7 +57,7 @@ async fn subscribe_returns_a_200_for_valid_form_data(
 async fn subscribe_returns_a_400_when_data_is_missing(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let email_client = get_mock_client().await;
+    let (email_client, _) = get_mock_client().await;
     let app = test::init_service(
         App::new()
             .configure(app_config)
@@ -92,7 +92,7 @@ async fn subscribe_returns_a_400_when_data_is_missing(
 async fn subscribe_returns_a_400_when_fields_are_present_but_empty(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let email_client = get_mock_client().await;
+    let (email_client, _) = get_mock_client().await;
     let app = test::init_service(
         App::new()
             .configure(app_config)
@@ -127,7 +127,7 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty(
 async fn subscribe_sends_a_confirmation_email_for_valid_data(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let email_client = get_mock_client().await;
+    let (email_client, mock_server) = get_mock_client().await;
     let app = test::init_service(
         App::new()
             .configure(app_config)
@@ -143,6 +143,14 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data(
         .set_payload(body)
         .to_request();
     test::call_service(&app, req).await;
+
+    let email_request = &mock_server.received_requests().await.unwrap()[0];
+    let body = std::str::from_utf8(&email_request.body)?;
+    let links: Vec<_> = linkify::LinkFinder::new()
+        .links(body)
+        .filter(|l| *l.kind() == linkify::LinkKind::Url)
+        .collect();
+    assert_eq!(links.len(), 2); // one for text, one for html
 
     Ok(())
 }
