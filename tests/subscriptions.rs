@@ -42,13 +42,39 @@ async fn subscribe_returns_a_200_for_valid_form_data(
         .set_payload(body)
         .to_request();
     let res = test::call_service(&app, req).await;
+
     assert_eq!(res.status(), http::StatusCode::OK);
 
-    let record = sqlx::query!("SELECT email, name FROM subscriptions",)
+    Ok(())
+}
+
+#[sqlx::test]
+async fn subscribe_persists_the_new_subscriber(
+    db_pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (email_client, _) = get_mock_client().await;
+    let app = test::init_service(
+        App::new()
+            .configure(app_config)
+            .app_data(web::Data::new(db_pool.clone()))
+            .app_data(web::Data::new(email_client)),
+    )
+    .await;
+
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let req = test::TestRequest::post()
+        .uri("/subscriptions")
+        .insert_header(ContentType::form_url_encoded())
+        .set_payload(body)
+        .to_request();
+    test::call_service(&app, req).await;
+
+    let record = sqlx::query!("SELECT email, name, status FROM subscriptions",)
         .fetch_one(&db_pool)
         .await?;
     assert_eq!(record.email, "ursula_le_guin@gmail.com");
     assert_eq!(record.name, "le guin");
+    assert_eq!(record.status, "pending_confirmation");
 
     Ok(())
 }
