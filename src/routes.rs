@@ -4,6 +4,8 @@ use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::EmailClient;
+
 use super::domain::{Subscriber, SubscriberEmail, SubscriberName};
 
 #[tracing::instrument]
@@ -28,7 +30,11 @@ impl TryFrom<FormData> for Subscriber {
 }
 
 #[tracing::instrument(skip(db_pool))]
-pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) -> impl Responder {
+pub async fn subscribe(
+    form: web::Form<FormData>,
+    db_pool: web::Data<PgPool>,
+    email_client: web::Data<EmailClient>,
+) -> impl Responder {
     let subscriber = Subscriber::try_from(form.0);
     let subscriber = match subscriber {
         Ok(subscriber) => subscriber,
@@ -37,7 +43,8 @@ pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) ->
             return HttpResponse::BadRequest().await;
         }
     };
-    sqlx::query!(
+
+    let query_result = sqlx::query!(
         r#"
             INSERT INTO subscriptions (id, email, name, subscribed_at, status)
             VALUES ($1, $2, $3, $4, 'confirmed')
@@ -48,13 +55,24 @@ pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) ->
         OffsetDateTime::now_utc(),
     )
     .execute(db_pool.get_ref())
-    .await
-    .map_or_else(
-        |e| {
-            tracing::error!("{}", e);
-            HttpResponse::InternalServerError()
-        },
-        |_| HttpResponse::Ok(),
-    )
-    .await
+    .await;
+    if let Err(e) = query_result {
+        tracing::error!("Failed to execute query: {e}");
+        return HttpResponse::InternalServerError().await;
+    }
+
+    let email_result = email_client
+        .send_email(
+            &subscriber.email,
+            "Welcome!",
+            "Welcome to our newsletter!",
+            "Welcome to our newsletter!",
+        )
+        .await;
+    if let Err(e) = email_result {
+        tracing::error!("Failed to send email: {e}");
+        return HttpResponse::InternalServerError().await;
+    }
+
+    HttpResponse::Ok().await
 }

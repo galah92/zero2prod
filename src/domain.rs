@@ -30,6 +30,7 @@ impl AsRef<str> for SubscriberName {
     }
 }
 
+#[derive(Debug)]
 pub struct SubscriberEmail(String);
 
 impl SubscriberEmail {
