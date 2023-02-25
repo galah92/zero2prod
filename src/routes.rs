@@ -44,7 +44,24 @@ pub async fn subscribe(
         }
     };
 
-    let query_result = sqlx::query!(
+    let query_result = insert_subscriber(db_pool.get_ref(), &subscriber).await;
+    if let Err(e) = query_result {
+        tracing::error!("Failed to execute query: {e}");
+        return HttpResponse::InternalServerError().await;
+    }
+
+    let email_result = send_confirmation_email(&email_client, &subscriber).await;
+    if let Err(e) = email_result {
+        tracing::error!("Failed to send email: {e}");
+        return HttpResponse::InternalServerError().await;
+    }
+
+    HttpResponse::Ok().await
+}
+
+#[tracing::instrument]
+async fn insert_subscriber(db_pool: &PgPool, subscriber: &Subscriber) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
             INSERT INTO subscriptions (id, email, name, subscribed_at, status)
             VALUES ($1, $2, $3, $4, 'confirmed')
@@ -54,15 +71,18 @@ pub async fn subscribe(
         subscriber.name.as_ref(),
         OffsetDateTime::now_utc(),
     )
-    .execute(db_pool.get_ref())
-    .await;
-    if let Err(e) = query_result {
-        tracing::error!("Failed to execute query: {e}");
-        return HttpResponse::InternalServerError().await;
-    }
+    .execute(db_pool)
+    .await?;
+    Ok(())
+}
 
+#[tracing::instrument]
+async fn send_confirmation_email(
+    email_client: &EmailClient,
+    subscriber: &Subscriber,
+) -> Result<(), reqwest::Error> {
     let confirmation_link = "https://my-api.com/subscriptions/confirm";
-    let email_result = email_client
+    email_client
         .send_email(
             &subscriber.email,
             "Welcome!",
@@ -74,11 +94,6 @@ pub async fn subscribe(
                 "Welcome to our newsletter!\nVisit {confirmation_link} to confirm your subscription."
             ),
         )
-        .await;
-    if let Err(e) = email_result {
-        tracing::error!("Failed to send email: {e}");
-        return HttpResponse::InternalServerError().await;
-    }
-
-    HttpResponse::Ok().await
+        .await?;
+    Ok(())
 }
