@@ -91,7 +91,6 @@ async fn the_link_returned_by_subscribe_returned_a_200_if_called(
 }
 
 #[sqlx::test]
-#[ignore]
 async fn the_link_returned_by_subscribe_confirms_a_subscriber(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
