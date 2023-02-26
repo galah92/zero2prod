@@ -1,3 +1,5 @@
+mod common;
+
 use actix_web::{
     http::{self, header::ContentType},
     test, web, App,
@@ -182,11 +184,8 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data(
 
     let email_request = &mock_server.received_requests().await.unwrap()[0];
     let body = std::str::from_utf8(&email_request.body)?;
-    let links: Vec<_> = linkify::LinkFinder::new()
-        .links(body)
-        .filter(|l| *l.kind() == linkify::LinkKind::Url)
-        .collect();
-    assert_eq!(links.len(), 2); // one for text, one for html
+    let confirmation_links = common::extract_links(body);
+    assert_eq!(confirmation_links.len(), 2); // one for text, one for html
 
     Ok(())
 }

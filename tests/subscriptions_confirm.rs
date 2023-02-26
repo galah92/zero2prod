@@ -1,3 +1,5 @@
+mod common;
+
 use actix_web::{
     http::{self, header::ContentType},
     test, web, App,
@@ -72,11 +74,7 @@ async fn the_link_returned_by_subscribe_returned_a_200_if_called(
 
     let email_request = &mock_server.received_requests().await.unwrap()[0];
     let body = std::str::from_utf8(&email_request.body)?;
-    let links: Vec<_> = linkify::LinkFinder::new()
-        .links(body)
-        .filter(|l| *l.kind() == linkify::LinkKind::Url)
-        .collect();
-    let confirmation_link = links[0].as_str();
+    let confirmation_link = common::extract_links(body)[0].clone();
     let link_uri = confirmation_link
         .split('/')
         .skip(3)
