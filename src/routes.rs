@@ -97,3 +97,17 @@ async fn send_confirmation_email(
         .await?;
     Ok(())
 }
+
+#[derive(Deserialize, Debug)]
+pub struct ConfirmationQuery {
+    subscription_token: String,
+}
+
+#[tracing::instrument]
+pub async fn confirm_subscription(
+    query: web::Query<ConfirmationQuery>,
+    // db_pool: web::Data<PgPool>,
+    // email_client: web::Data<EmailClient>,
+) -> impl Responder {
+    HttpResponse::Ok().await
+}

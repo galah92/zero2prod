@@ -14,4 +14,8 @@ use actix_web::web;
 pub fn app_config(cfg: &mut web::ServiceConfig) {
     cfg.route("/health_check", web::get().to(routes::health_check));
     cfg.route("/subscriptions", web::post().to(routes::subscribe));
+    cfg.route(
+        "/subscriptions/confirm",
+        web::get().to(routes::confirm_subscription),
+    );
 }
