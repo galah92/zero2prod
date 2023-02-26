@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{http::StatusCode, web, HttpResponse, Responder, ResponseError};
 use rand::Rng;
 use serde::Deserialize;
 use sqlx::{PgPool, Postgres, Transaction};
@@ -33,52 +33,74 @@ impl TryFrom<FormData> for Subscriber {
 #[derive(Debug)]
 pub struct ApplicationBaseUrl(pub String);
 
+#[derive(thiserror::Error)]
+pub enum SubscribeError {
+    #[error("{0}")]
+    ValidationError(String),
+    #[error(transparent)]
+    UnexpectedError(#[from] Box<dyn std::error::Error>),
+}
+
+impl std::fmt::Debug for SubscribeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+fn error_chain_fmt(
+    e: &impl std::error::Error,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    writeln!(f, "{e}\n")?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        writeln!(f, "Caused by:\n\t{cause}")?;
+        current = cause.source();
+    }
+    Ok(())
+}
+
+impl ResponseError for SubscribeError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            SubscribeError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            SubscribeError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 #[tracing::instrument(skip(db_pool))]
 pub async fn subscribe(
     form: web::Form<FormData>,
     db_pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     app_base_url: web::Data<ApplicationBaseUrl>,
-) -> impl Responder {
-    let subscriber = Subscriber::try_from(form.0);
-    let subscriber = match subscriber {
-        Ok(subscriber) => subscriber,
-        Err(e) => {
-            tracing::warn!("{e}");
-            return HttpResponse::BadRequest().await;
-        }
-    };
-
-    let mut transaction = db_pool.begin().await.unwrap();
-    let subscriber_id = match insert_subscriber(&mut transaction, &subscriber).await {
-        Ok(subscriber_id) => subscriber_id,
-        Err(e) => {
-            tracing::error!("Failed to insert subscriber: {e}");
-            return HttpResponse::InternalServerError().await;
-        }
-    };
-
+) -> Result<impl Responder, SubscribeError> {
+    let subscriber = Subscriber::try_from(form.0).map_err(SubscribeError::ValidationError)?;
+    let mut transaction = db_pool
+        .begin()
+        .await
+        .map_err(|e| SubscribeError::UnexpectedError(e.into()))?;
+    let subscriber_id = insert_subscriber(&mut transaction, &subscriber)
+        .await
+        .map_err(|e| SubscribeError::UnexpectedError(e.into()))?;
     let subscription_token = generate_subscription_token().await;
-    let token_result = store_token(&mut transaction, &subscriber_id, &subscription_token).await;
-    if let Err(e) = token_result {
-        tracing::error!("Failed to store token: {e}");
-        return HttpResponse::InternalServerError().await;
-    }
-    transaction.commit().await.unwrap();
-
-    let email_result = send_confirmation_email(
+    store_token(&mut transaction, &subscriber_id, &subscription_token)
+        .await
+        .map_err(|e| SubscribeError::UnexpectedError(e.into()))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|e| SubscribeError::UnexpectedError(e.into()))?;
+    send_confirmation_email(
         &email_client,
         &subscriber,
         &app_base_url,
         &subscription_token,
     )
-    .await;
-    if let Err(e) = email_result {
-        tracing::error!("Failed to send email: {e}");
-        return HttpResponse::InternalServerError().await;
-    }
-
-    HttpResponse::Ok().await
+    .await
+    .map_err(|e| SubscribeError::UnexpectedError(e.into()))?;
+    Ok(HttpResponse::Ok())
 }
 
 async fn generate_subscription_token() -> String {

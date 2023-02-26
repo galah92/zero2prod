@@ -6,6 +6,7 @@ use actix_web::{
 };
 use fake::{faker::internet::en::SafeEmail, Fake, Faker};
 use sqlx::PgPool;
+use tracing_actix_web::TracingLogger;
 use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
 use zero2prod::{app_config, ApplicationBaseUrl, EmailClient, SubscriberEmail};
 
@@ -186,6 +187,42 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data(
     let body = std::str::from_utf8(&email_request.body)?;
     let confirmation_links = common::extract_links(body);
     assert_eq!(confirmation_links.len(), 2); // one for text, one for html
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error(
+    db_pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    zero2prod::init_tracing();
+
+    let (email_client, _) = get_mock_client().await;
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
+    let app = test::init_service(
+        App::new()
+            .wrap(TracingLogger::default())
+            .configure(app_config)
+            .app_data(web::Data::new(db_pool.clone()))
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
+    )
+    .await;
+
+    sqlx::query!("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;",)
+        .execute(&db_pool)
+        .await
+        .unwrap();
+
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let req = test::TestRequest::post()
+        .uri("/subscriptions")
+        .insert_header(ContentType::form_url_encoded())
+        .set_payload(body)
+        .to_request();
+    let res = test::call_service(&app, req).await;
+
+    assert_eq!(res.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
 
     Ok(())
 }
