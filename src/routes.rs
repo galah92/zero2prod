@@ -180,25 +180,44 @@ pub struct ConfirmationQuery {
     subscription_token: String,
 }
 
+#[derive(thiserror::Error)]
+pub enum ConfirmSubscriptionError {
+    #[error("{0}")]
+    Unauthorized(String),
+    #[error(transparent)]
+    UnexpectedError(#[from] Box<dyn std::error::Error>),
+}
+
+impl std::fmt::Debug for ConfirmSubscriptionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl ResponseError for ConfirmSubscriptionError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            ConfirmSubscriptionError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            ConfirmSubscriptionError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 #[tracing::instrument]
 pub async fn confirm_subscription(
     query: web::Query<ConfirmationQuery>,
     db_pool: web::Data<PgPool>,
-) -> impl Responder {
-    let subscriber_id =
-        match get_subscriber_id_from_token(&db_pool, &query.subscription_token).await {
-            Ok(subscriber_id) => subscriber_id,
-            Err(_) => return HttpResponse::InternalServerError().await,
-        };
-    match subscriber_id {
-        None => HttpResponse::Unauthorized().await,
-        Some(subscriber_id) => {
-            if confirm_subscriber(&db_pool, subscriber_id).await.is_err() {
-                return HttpResponse::InternalServerError().await;
-            }
-            HttpResponse::Ok().await
-        }
-    }
+) -> Result<impl Responder, ConfirmSubscriptionError> {
+    let subscriber_id = get_subscriber_id_from_token(&db_pool, &query.subscription_token)
+        .await
+        .map_err(|e| ConfirmSubscriptionError::UnexpectedError(e.into()))?;
+    subscriber_id.ok_or_else(|| {
+        ConfirmSubscriptionError::Unauthorized("Invalid subscription token".into())
+    })?;
+    confirm_subscriber(&db_pool, subscriber_id.unwrap())
+        .await
+        .map_err(|e| ConfirmSubscriptionError::UnexpectedError(e.into()))?;
+    Ok(HttpResponse::Ok())
 }
 
 #[tracing::instrument]
@@ -208,11 +227,7 @@ pub async fn confirm_subscriber(db_pool: &PgPool, subscriber_id: Uuid) -> Result
         subscriber_id,
     )
     .execute(db_pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    .await?;
     Ok(())
 }
 
@@ -226,10 +241,6 @@ pub async fn get_subscriber_id_from_token(
         subscription_token,
     )
     .fetch_optional(db_pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    .await?;
     Ok(result.map(|r| r.subscriber_id))
 }
