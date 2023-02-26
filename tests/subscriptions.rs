@@ -5,7 +5,7 @@ use actix_web::{
 use fake::{faker::internet::en::SafeEmail, Fake, Faker};
 use sqlx::PgPool;
 use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
-use zero2prod::{app_config, EmailClient, SubscriberEmail};
+use zero2prod::{app_config, ApplicationBaseUrl, EmailClient, SubscriberEmail};
 
 async fn get_mock_client() -> (EmailClient, MockServer) {
     let mock_server = MockServer::start().await;
@@ -27,11 +27,13 @@ async fn subscribe_returns_a_200_for_valid_form_data(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (email_client, _) = get_mock_client().await;
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
     let app = test::init_service(
         App::new()
             .configure(app_config)
             .app_data(web::Data::new(db_pool.clone()))
-            .app_data(web::Data::new(email_client)),
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
     )
     .await;
 
@@ -53,11 +55,13 @@ async fn subscribe_persists_the_new_subscriber(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (email_client, _) = get_mock_client().await;
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
     let app = test::init_service(
         App::new()
             .configure(app_config)
             .app_data(web::Data::new(db_pool.clone()))
-            .app_data(web::Data::new(email_client)),
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
     )
     .await;
 
@@ -84,11 +88,13 @@ async fn subscribe_returns_a_400_when_data_is_missing(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (email_client, _) = get_mock_client().await;
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
     let app = test::init_service(
         App::new()
             .configure(app_config)
             .app_data(web::Data::new(db_pool.clone()))
-            .app_data(web::Data::new(email_client)),
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
     )
     .await;
 
@@ -119,11 +125,13 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (email_client, _) = get_mock_client().await;
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
     let app = test::init_service(
         App::new()
             .configure(app_config)
             .app_data(web::Data::new(db_pool.clone()))
-            .app_data(web::Data::new(email_client)),
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
     )
     .await;
 
@@ -154,11 +162,13 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (email_client, mock_server) = get_mock_client().await;
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
     let app = test::init_service(
         App::new()
             .configure(app_config)
             .app_data(web::Data::new(db_pool.clone()))
-            .app_data(web::Data::new(email_client)),
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
     )
     .await;
 

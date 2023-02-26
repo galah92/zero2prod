@@ -6,6 +6,7 @@ mod telemetry;
 
 pub use domain::SubscriberEmail;
 pub use email::EmailClient;
+pub use routes::ApplicationBaseUrl;
 pub use settings::get_settings;
 pub use telemetry::init_tracing;
 

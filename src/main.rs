@@ -1,7 +1,7 @@
 use actix_web::{web, App, HttpServer};
 use sqlx::PgPool;
 use tracing_actix_web::TracingLogger;
-use zero2prod::{app_config, get_settings, EmailClient, SubscriberEmail};
+use zero2prod::{app_config, get_settings, ApplicationBaseUrl, EmailClient, SubscriberEmail};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -20,12 +20,15 @@ async fn main() -> std::io::Result<()> {
     );
     let email_client = web::Data::new(email_client);
 
+    let app_base_url = web::Data::new(ApplicationBaseUrl(settings.app_base_url));
+
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
             .configure(app_config)
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
+            .app_data(app_base_url.clone())
     })
     .bind(address)?
     .run()

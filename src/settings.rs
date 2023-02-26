@@ -4,6 +4,7 @@ use config::{Config, ConfigError, Environment, File};
 pub struct Settings {
     pub app_host: String,
     pub app_port: u16,
+    pub app_base_url: String,
     pub database_url: String,
     pub email_base_url: String,
     pub email_auth_token: String,

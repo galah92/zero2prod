@@ -29,11 +29,15 @@ impl TryFrom<FormData> for Subscriber {
     }
 }
 
+#[derive(Debug)]
+pub struct ApplicationBaseUrl(pub String);
+
 #[tracing::instrument(skip(db_pool))]
 pub async fn subscribe(
     form: web::Form<FormData>,
     db_pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
+    app_base_url: web::Data<ApplicationBaseUrl>,
 ) -> impl Responder {
     let subscriber = Subscriber::try_from(form.0);
     let subscriber = match subscriber {
@@ -50,7 +54,7 @@ pub async fn subscribe(
         return HttpResponse::InternalServerError().await;
     }
 
-    let email_result = send_confirmation_email(&email_client, &subscriber).await;
+    let email_result = send_confirmation_email(&email_client, &subscriber, &app_base_url).await;
     if let Err(e) = email_result {
         tracing::error!("Failed to send email: {e}");
         return HttpResponse::InternalServerError().await;
@@ -80,8 +84,11 @@ async fn insert_subscriber(db_pool: &PgPool, subscriber: &Subscriber) -> Result<
 async fn send_confirmation_email(
     email_client: &EmailClient,
     subscriber: &Subscriber,
+    app_base_url: &ApplicationBaseUrl,
 ) -> Result<(), reqwest::Error> {
-    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let app_base_url = &app_base_url.0;
+    let confirmation_link =
+        format!("{app_base_url}/subscriptions/confirm?subscription_token=mytoken");
     email_client
         .send_email(
             &subscriber.email,
@@ -109,5 +116,6 @@ pub async fn confirm_subscription(
     // db_pool: web::Data<PgPool>,
     // email_client: web::Data<EmailClient>,
 ) -> impl Responder {
+    dbg!(query.0.subscription_token);
     HttpResponse::Ok().await
 }
