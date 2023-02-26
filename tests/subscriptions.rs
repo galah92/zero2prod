@@ -195,8 +195,6 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data(
 async fn subscribe_fails_if_there_is_a_fatal_database_error(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    zero2prod::init_tracing();
-
     let (email_client, _) = get_mock_client().await;
     let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
     let app = test::init_service(
