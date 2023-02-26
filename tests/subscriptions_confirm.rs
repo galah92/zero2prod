@@ -89,3 +89,50 @@ async fn the_link_returned_by_subscribe_returned_a_200_if_called(
 
     Ok(())
 }
+
+#[sqlx::test]
+#[ignore]
+async fn the_link_returned_by_subscribe_confirms_a_subscriber(
+    db_pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (email_client, mock_server) = get_mock_client().await;
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
+    let app = test::init_service(
+        App::new()
+            .configure(app_config)
+            .app_data(web::Data::new(db_pool.clone()))
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
+    )
+    .await;
+
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let req = test::TestRequest::post()
+        .uri("/subscriptions")
+        .insert_header(ContentType::form_url_encoded())
+        .set_payload(body)
+        .to_request();
+    test::call_service(&app, req).await;
+
+    let email_request = &mock_server.received_requests().await.unwrap()[0];
+    let body = std::str::from_utf8(&email_request.body)?;
+    let confirmation_link = common::extract_links(body)[0].clone();
+    let link_uri = confirmation_link
+        .split('/')
+        .skip(3)
+        .collect::<Vec<_>>()
+        .join("/");
+    let link_uri = format!("/{link_uri}");
+
+    let req = test::TestRequest::get().uri(&link_uri).to_request();
+    test::call_service(&app, req).await;
+
+    let record = sqlx::query!("SELECT email, name, status FROM subscriptions",)
+        .fetch_one(&db_pool)
+        .await?;
+    assert_eq!(record.email, "ursula_le_guin@gmail.com");
+    assert_eq!(record.name, "le guin");
+    assert_eq!(record.status, "confirmed");
+
+    Ok(())
+}
