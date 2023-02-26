@@ -19,4 +19,5 @@ pub fn app_config(cfg: &mut web::ServiceConfig) {
         "/subscriptions/confirm",
         web::get().to(routes::confirm_subscription),
     );
+    cfg.route("/newsletters", web::post().to(routes::post_newsletter));
 }

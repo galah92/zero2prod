@@ -244,3 +244,8 @@ pub async fn get_subscriber_id_from_token(
     .await?;
     Ok(result.map(|r| r.subscriber_id))
 }
+
+#[tracing::instrument]
+pub async fn post_newsletter() -> impl Responder {
+    HttpResponse::Ok().await
+}

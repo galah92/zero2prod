@@ -25,7 +25,6 @@ async fn get_mock_client() -> (EmailClient, MockServer) {
 }
 
 #[sqlx::test]
-#[ignore]
 async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -57,7 +56,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     }
     });
     let req = test::TestRequest::post()
-        .uri("/subscriptions/confirm")
+        .uri("/newsletters")
         .set_json(body)
         .to_request();
     let res = test::call_service(&app, req).await;
