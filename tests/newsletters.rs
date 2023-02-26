@@ -18,12 +18,6 @@ async fn get_mock_client() -> (EmailClient, MockServer) {
     let from = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
     let email_client = EmailClient::new(mock_server.uri(), auth_token, from);
 
-    Mock::given(any())
-        .respond_with(ResponseTemplate::new(200))
-        .named("catch all")
-        .mount(&mock_server)
-        .await;
-
     (email_client, mock_server)
 }
 
@@ -35,6 +29,13 @@ async fn create_unconfirmed_subscriber(
     >,
     mock_server: &MockServer,
 ) -> Vec<String> {
+    let _mock_guard = Mock::given(any())
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .named("subscriber confirmation email")
+        .mount_as_scoped(mock_server)
+        .await;
+
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let req = test::TestRequest::post()
         .uri("/subscriptions")
@@ -105,7 +106,6 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
 }
 
 #[sqlx::test]
-#[ignore]
 async fn newsletters_are_delivered_to_confirmed_subscribers(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
