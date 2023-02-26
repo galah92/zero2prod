@@ -11,14 +11,34 @@ use sqlx::PgPool;
 use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
 use zero2prod::{app_config, ApplicationBaseUrl, EmailClient, SubscriberEmail};
 
-async fn get_mock_client() -> (EmailClient, MockServer) {
+async fn setup_mocks(
+    db_pool: &PgPool,
+) -> (
+    impl Service<
+        actix_http::Request,
+        Response = actix_web::dev::ServiceResponse,
+        Error = actix_web::Error,
+    >,
+    MockServer,
+) {
     let mock_server = MockServer::start().await;
 
     let auth_token = Faker.fake();
     let from = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
     let email_client = EmailClient::new(mock_server.uri(), auth_token, from);
 
-    (email_client, mock_server)
+    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
+
+    let app = test::init_service(
+        App::new()
+            .configure(app_config)
+            .app_data(web::Data::new(db_pool.clone()))
+            .app_data(web::Data::new(email_client))
+            .app_data(web::Data::new(app_base_url)),
+    )
+    .await;
+
+    (app, mock_server)
 }
 
 async fn create_unconfirmed_subscriber(
@@ -68,16 +88,7 @@ async fn create_confirmed_subscriber(
 async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (email_client, mock_server) = get_mock_client().await;
-    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
-    let app = test::init_service(
-        App::new()
-            .configure(app_config)
-            .app_data(web::Data::new(db_pool.clone()))
-            .app_data(web::Data::new(email_client))
-            .app_data(web::Data::new(app_base_url)),
-    )
-    .await;
+    let (app, mock_server) = setup_mocks(&db_pool).await;
 
     create_unconfirmed_subscriber(&app, &mock_server).await;
 
@@ -109,16 +120,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
 async fn newsletters_are_delivered_to_confirmed_subscribers(
     db_pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (email_client, mock_server) = get_mock_client().await;
-    let app_base_url = ApplicationBaseUrl("http://127.0.0.1".to_string());
-    let app = test::init_service(
-        App::new()
-            .configure(app_config)
-            .app_data(web::Data::new(db_pool.clone()))
-            .app_data(web::Data::new(email_client))
-            .app_data(web::Data::new(app_base_url)),
-    )
-    .await;
+    let (app, mock_server) = setup_mocks(&db_pool).await;
 
     create_confirmed_subscriber(&app, &mock_server).await;
 

@@ -283,7 +283,6 @@ pub async fn post_newsletter(
     email_client: web::Data<EmailClient>,
 ) -> Result<impl Responder, PublishError> {
     let subscribers = get_confirmed_subscribers(&pool).await?;
-    dbg!(&subscribers);
     for subscriber in subscribers {
         match subscriber {
             Ok(subscriber) => {
