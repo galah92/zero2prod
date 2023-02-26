@@ -10,14 +10,13 @@ pub use routes::ApplicationBaseUrl;
 pub use settings::get_settings;
 pub use telemetry::init_tracing;
 
-use actix_web::web;
+use actix_web::web::{get, post, ServiceConfig};
+use routes::*;
 
-pub fn app_config(cfg: &mut web::ServiceConfig) {
-    cfg.route("/health_check", web::get().to(routes::health_check));
-    cfg.route("/subscriptions", web::post().to(routes::subscribe));
-    cfg.route(
-        "/subscriptions/confirm",
-        web::get().to(routes::confirm_subscription),
-    );
-    cfg.route("/newsletters", web::post().to(routes::post_newsletter));
+pub fn app_config(cfg: &mut ServiceConfig) {
+    cfg.route("/health_check", get().to(health_check));
+    cfg.route("/subscriptions", post().to(subscribe));
+    cfg.route("/subscriptions/confirm", get().to(confirm_subscription));
+    cfg.route("/newsletters", post().to(post_newsletter));
+    cfg.route("/", get().to(home));
 }
