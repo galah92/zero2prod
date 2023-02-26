@@ -1,9 +1,11 @@
 mod common;
 
 use actix_web::{
+    dev::Service,
     http::{self, header::ContentType},
     test, web, App,
 };
+use common::extract_links;
 use fake::{faker::internet::en::SafeEmail, Fake, Faker};
 use sqlx::PgPool;
 use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
@@ -24,6 +26,40 @@ async fn get_mock_client() -> (EmailClient, MockServer) {
     (email_client, mock_server)
 }
 
+async fn create_unconfirmed_subscriber(
+    app: &impl Service<
+        actix_http::Request,
+        Response = actix_web::dev::ServiceResponse,
+        Error = actix_web::Error,
+    >,
+) -> Vec<String> {
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let req = test::TestRequest::post()
+        .uri("/subscriptions")
+        .insert_header(ContentType::form_url_encoded())
+        .set_payload(body)
+        .to_request();
+    let res = test::call_service(&app, req).await;
+    let body = test::read_body(res).await;
+    let body = std::str::from_utf8(&body).unwrap();
+    extract_links(body)
+}
+
+async fn create_confirmed_subscriber(
+    app: &impl Service<
+        actix_http::Request,
+        Response = actix_web::dev::ServiceResponse,
+        Error = actix_web::Error,
+    >,
+) {
+    let links = create_unconfirmed_subscriber(app).await;
+    let link_uri = &links[0].split('/').skip(3).collect::<Vec<_>>().join("/");
+    let link_uri = format!("/{link_uri}");
+    let req = test::TestRequest::get().uri(&link_uri).to_request();
+    let res = test::call_service(&app, req).await;
+    assert_eq!(res.status(), http::StatusCode::OK);
+}
+
 #[sqlx::test]
 async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     db_pool: PgPool,
@@ -39,21 +75,14 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     )
     .await;
 
-    // create an unconfirmed subscriber
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-    let req = test::TestRequest::post()
-        .uri("/subscriptions")
-        .insert_header(ContentType::form_url_encoded())
-        .set_payload(body)
-        .to_request();
-    test::call_service(&app, req).await;
+    create_unconfirmed_subscriber(&app).await;
 
     let body = serde_json::json!({
-    "title": "Newsletter title",
-    "content": {
-    "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>",
-    }
+        "title": "Newsletter title",
+        "content": {
+            "text": "Newsletter body as plain text",
+            "html": "<p>Newsletter body as HTML</p>",
+        }
     });
     let req = test::TestRequest::post()
         .uri("/newsletters")
