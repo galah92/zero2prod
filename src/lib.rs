@@ -19,5 +19,6 @@ pub fn app_config(cfg: &mut ServiceConfig) {
     cfg.route("/subscriptions/confirm", get().to(confirm_subscription));
     cfg.route("/newsletters", post().to(post_newsletter));
     cfg.route("/", get().to(home));
-    cfg.route("/login", get().to(login));
+    cfg.route("/login", get().to(login_page));
+    cfg.route("/login", post().to(login));
 }
