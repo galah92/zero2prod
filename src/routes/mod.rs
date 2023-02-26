@@ -1,3 +1,4 @@
+mod login;
 mod home;
 mod newsletters;
 mod subscriptions;
@@ -8,6 +9,7 @@ use super::EmailClient;
 use actix_web::{HttpResponse, Responder};
 
 pub use home::home;
+pub use login::login;
 pub use newsletters::post_newsletter;
 pub use subscriptions::{subscribe, ApplicationBaseUrl};
 pub use subscriptions_confirm::confirm_subscription;
