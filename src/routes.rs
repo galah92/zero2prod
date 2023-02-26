@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder};
 use rand::Rng;
 use serde::Deserialize;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -49,7 +49,8 @@ pub async fn subscribe(
         }
     };
 
-    let subscriber_id = match insert_subscriber(db_pool.get_ref(), &subscriber).await {
+    let mut transaction = db_pool.begin().await.unwrap();
+    let subscriber_id = match insert_subscriber(&mut transaction, &subscriber).await {
         Ok(subscriber_id) => subscriber_id,
         Err(e) => {
             tracing::error!("Failed to insert subscriber: {e}");
@@ -58,11 +59,12 @@ pub async fn subscribe(
     };
 
     let subscription_token = generate_subscription_token().await;
-    let token_result = store_token(db_pool.get_ref(), &subscriber_id, &subscription_token).await;
+    let token_result = store_token(&mut transaction, &subscriber_id, &subscription_token).await;
     if let Err(e) = token_result {
         tracing::error!("Failed to store token: {e}");
         return HttpResponse::InternalServerError().await;
     }
+    transaction.commit().await.unwrap();
 
     let email_result = send_confirmation_email(
         &email_client,
@@ -88,7 +90,10 @@ async fn generate_subscription_token() -> String {
 }
 
 #[tracing::instrument]
-async fn insert_subscriber(db_pool: &PgPool, subscriber: &Subscriber) -> Result<Uuid, sqlx::Error> {
+async fn insert_subscriber(
+    transaction: &mut Transaction<'_, Postgres>,
+    subscriber: &Subscriber,
+) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::new_v4();
     sqlx::query!(
         r#"
@@ -100,14 +105,14 @@ async fn insert_subscriber(db_pool: &PgPool, subscriber: &Subscriber) -> Result<
         subscriber.name.as_ref(),
         OffsetDateTime::now_utc(),
     )
-    .execute(db_pool)
+    .execute(transaction)
     .await?;
     Ok(id)
 }
 
 #[tracing::instrument]
 async fn store_token(
-    db_pool: &PgPool,
+    transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: &Uuid,
     subscription_token: &str,
 ) -> Result<(), sqlx::Error> {
@@ -117,7 +122,7 @@ VALUES ($1, $2)"#,
         subscription_token,
         subscriber_id
     )
-    .execute(db_pool)
+    .execute(transaction)
     .await?;
     Ok(())
 }
