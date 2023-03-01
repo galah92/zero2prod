@@ -7,7 +7,7 @@ mod telemetry;
 pub use domain::SubscriberEmail;
 pub use email::EmailClient;
 pub use routes::ApplicationBaseUrl;
-pub use settings::get_settings;
+pub use settings::*;
 pub use telemetry::init_tracing;
 
 use actix_web::web::{get, post, ServiceConfig};
